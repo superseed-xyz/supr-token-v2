@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.23;
+
+import {SUPRTokenV2} from '../contracts/SUPRTokenV2.sol';
+import {IXERC20Factory} from '../interfaces/IXERC20Factory.sol';
+import {XERC20Lockbox} from '../contracts/XERC20Lockbox.sol';
+import {CREATE3} from 'isolmate/utils/CREATE3.sol';
+import {EnumerableSet} from '@openzeppelin/contracts/utils/structs/EnumerableSet.sol';
+
+/**
+ * @title SUPRTokenV2Factory
+ * @notice Deploys SUPRTokenV2 tokens and XERC20Lockbox instances at deterministic
+ *         addresses across every chain via CREATE3.
+ *
+ *         The salt for a token is derived from (name, symbol, deployer), guaranteeing
+ *         the same address on all chains when called from the same EOA/multisig.
+ *
+ *         Lockboxes should only be deployed on chains that have a canonical ERC20 to
+ *         wrap (Superseed chain: V1 SUPR).  Ethereum mainnet runs crosschainERC20.
+ */
+contract SUPRTokenV2Factory is IXERC20Factory {
+  using EnumerableSet for EnumerableSet.AddressSet;
+
+  /// @dev xerc20 address → lockbox address (zero if none deployed yet)
+  mapping(address => address) internal _lockboxRegistry;
+
+  EnumerableSet.AddressSet internal _lockboxRegistryArray;
+  EnumerableSet.AddressSet internal _xerc20RegistryArray;
+
+  // -------------------------------------------------------------------------
+  // External
+  // -------------------------------------------------------------------------
+
+  /**
+   * @notice Deploys a SUPRTokenV2 token using CREATE3 for a deterministic address.
+   * @param _name         Token name
+   * @param _symbol       Token symbol
+   * @param _minterLimits 24-hour minting limits per bridge (parallel array with _bridges)
+   * @param _burnerLimits 24-hour burning limits per bridge (parallel array with _bridges)
+   * @param _bridges      Bridge addresses to configure at deploy time
+   * @return _xerc20      Address of the deployed token
+   */
+  function deployXERC20(
+    string memory _name,
+    string memory _symbol,
+    uint256[] memory _minterLimits,
+    uint256[] memory _burnerLimits,
+    address[] memory _bridges
+  ) external returns (address _xerc20) {
+    _xerc20 = _deployXERC20(_name, _symbol, _minterLimits, _burnerLimits, _bridges);
+    emit XERC20Deployed(_xerc20);
+  }
+
+  /**
+   * @notice Deploys a XERC20Lockbox for a previously deployed SUPRTokenV2.
+   * @dev    On Ethereum mainnet, _baseToken should be the V1 SUPR token address.
+   *         Only the current owner of the xERC20 may deploy its lockbox.
+   *         A single lockbox per xERC20 is enforced.
+   * @param _xerc20    Address of the SUPRTokenV2 token
+   * @param _baseToken Address of the canonical ERC20 to wrap (address(0) if native gas token)
+   * @param _isNative  True if wrapping the chain's native gas token
+   * @return _lockbox  Address of the deployed lockbox
+   */
+  function deployLockbox(
+    address _xerc20,
+    address _baseToken,
+    bool _isNative
+  ) external returns (address payable _lockbox) {
+    if ((_baseToken == address(0) && !_isNative) || (_isNative && _baseToken != address(0))) {
+      revert IXERC20Factory_BadTokenAddress();
+    }
+    if (SUPRTokenV2(_xerc20).owner() != msg.sender) revert IXERC20Factory_NotOwner();
+    if (_lockboxRegistry[_xerc20] != address(0)) revert IXERC20Factory_LockboxAlreadyDeployed();
+
+    _lockbox = _deployLockbox(_xerc20, _baseToken, _isNative);
+    emit LockboxDeployed(_lockbox);
+  }
+
+  // -------------------------------------------------------------------------
+  // Internal
+  // -------------------------------------------------------------------------
+
+  function _deployXERC20(
+    string memory _name,
+    string memory _symbol,
+    uint256[] memory _minterLimits,
+    uint256[] memory _burnerLimits,
+    address[] memory _bridges
+  ) internal returns (address _xerc20) {
+    uint256 _bridgesLength = _bridges.length;
+    if (_minterLimits.length != _bridgesLength || _burnerLimits.length != _bridgesLength) {
+      revert IXERC20Factory_InvalidLength();
+    }
+
+    // abi.encode (not encodePacked): packed encoding of consecutive dynamic types is
+    // ambiguous, e.g. ("AB","C") and ("A","BC") collide. encode is collision-safe.
+    bytes32 _salt = keccak256(abi.encode(_name, _symbol, msg.sender));
+    bytes memory _creation = type(SUPRTokenV2).creationCode;
+    bytes memory _bytecode = abi.encodePacked(_creation, abi.encode(_name, _symbol, address(this)));
+
+    _xerc20 = CREATE3.deploy(_salt, _bytecode, 0);
+    EnumerableSet.add(_xerc20RegistryArray, _xerc20);
+
+    for (uint256 _i; _i < _bridgesLength; ++_i) {
+      SUPRTokenV2(_xerc20).setLimits(_bridges[_i], _minterLimits[_i], _burnerLimits[_i]);
+    }
+
+    SUPRTokenV2(_xerc20).transferOwnership(msg.sender);
+  }
+
+  function _deployLockbox(
+    address _xerc20,
+    address _baseToken,
+    bool _isNative
+  ) internal returns (address payable _lockbox) {
+    bytes32 _salt = keccak256(abi.encodePacked(_xerc20, _baseToken, msg.sender));
+    bytes memory _creation = type(XERC20Lockbox).creationCode;
+    bytes memory _bytecode = abi.encodePacked(_creation, abi.encode(_xerc20, _baseToken, _isNative));
+
+    _lockbox = payable(CREATE3.deploy(_salt, _bytecode, 0));
+
+    SUPRTokenV2(_xerc20).setLockbox(address(_lockbox));
+    EnumerableSet.add(_lockboxRegistryArray, _lockbox);
+    _lockboxRegistry[_xerc20] = _lockbox;
+  }
+}

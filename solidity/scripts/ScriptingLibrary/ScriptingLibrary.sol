@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.4 <0.9.0;
+pragma solidity 0.8.23;
 
 import {Test} from 'forge-std/Test.sol';
-import {XERC20Factory, IXERC20Factory} from '../../contracts/XERC20Factory.sol';
 import {Script} from 'forge-std/Script.sol';
 
 contract ScriptingLibrary {
