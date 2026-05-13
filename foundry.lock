@@ -31,5 +31,11 @@
       "name": "0.1.1",
       "rev": "ce5d128391feb6f64dff05d8d4431c799646b2c5"
     }
+  },
+  "lib/solady": {
+    "tag": {
+      "name": "v0.1.26",
+      "rev": "acd959aa4bd04720d640bf4e6a5c71037510cc4b"
+    }
   }
 }

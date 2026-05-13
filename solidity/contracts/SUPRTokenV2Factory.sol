@@ -4,7 +4,7 @@ pragma solidity 0.8.23;
 import {SUPRTokenV2} from '../contracts/SUPRTokenV2.sol';
 import {IXERC20Factory} from '../interfaces/IXERC20Factory.sol';
 import {XERC20Lockbox} from '../contracts/XERC20Lockbox.sol';
-import {CREATE3} from 'isolmate/utils/CREATE3.sol';
+import {CREATE3} from 'solady/utils/CREATE3.sol';
 import {EnumerableSet} from '@openzeppelin/contracts/utils/structs/EnumerableSet.sol';
 
 /**
@@ -98,7 +98,7 @@ contract SUPRTokenV2Factory is IXERC20Factory {
     bytes memory _creation = type(SUPRTokenV2).creationCode;
     bytes memory _bytecode = abi.encodePacked(_creation, abi.encode(_name, _symbol, address(this)));
 
-    _xerc20 = CREATE3.deploy(_salt, _bytecode, 0);
+    _xerc20 = CREATE3.deployDeterministic(_bytecode, _salt);
     EnumerableSet.add(_xerc20RegistryArray, _xerc20);
 
     for (uint256 _i; _i < _bridgesLength; ++_i) {
@@ -117,7 +117,7 @@ contract SUPRTokenV2Factory is IXERC20Factory {
     bytes memory _creation = type(XERC20Lockbox).creationCode;
     bytes memory _bytecode = abi.encodePacked(_creation, abi.encode(_xerc20, _baseToken, _isNative));
 
-    _lockbox = payable(CREATE3.deploy(_salt, _bytecode, 0));
+    _lockbox = payable(CREATE3.deployDeterministic(_bytecode, _salt));
 
     SUPRTokenV2(_xerc20).setLockbox(address(_lockbox));
     EnumerableSet.add(_lockboxRegistryArray, _lockbox);
