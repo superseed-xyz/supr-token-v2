@@ -1,7 +1,4 @@
-ds-test/=lib/ds-test/src
-prb/test/=lib/prb-test/src/
 forge-std/=lib/forge-std/src
 isolmate/=lib/isolmate/src
 solady/=lib/solady/src/
 @openzeppelin/=lib/openzeppelin-contracts
-permit2/=lib/permit2
