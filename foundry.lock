@@ -11,12 +11,6 @@
       "rev": "2f112697506eab12d433a65fdc31a639548fe365"
     }
   },
-  "lib/isolmate": {
-    "branch": {
-      "name": "main",
-      "rev": "73ce8b9adaf951e3ec702493bd4da010d74eaa74"
-    }
-  },
   "lib/openzeppelin-contracts": {
     "branch": {
       "name": "v4.9.3",

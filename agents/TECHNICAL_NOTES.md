@@ -18,7 +18,7 @@ agents/               Local-only agent workspace (git-ignored)
   plans/              Active plans
 lib/                  Git submodules
   openzeppelin-contracts  v4.9.3
-  isolmate                CREATE3 utility
+  solady                  CREATE3 utility
   forge-std
   prb-test
   ds-test
@@ -38,7 +38,7 @@ lib/                  Git submodules
 - Lockbox address bypasses all rate limits when minting/burning
 
 ### SUPRTokenV2Factory
-- Uses `CREATE3` (isolmate) for deterministic addresses across chains
+- Uses `CREATE3` (solady) for deterministic addresses across chains
 - Salt for token: `keccak256(name, symbol, msg.sender)`
 - Salt for lockbox: `keccak256(xerc20, baseToken, msg.sender)`
 - Transfers ownership to caller after setting initial bridge limits
@@ -156,4 +156,4 @@ INK_RPC=...
 - Unit tests: `solidity/test/unit/`
 - E2E tests: `solidity/test/e2e/`
 - OZ contracts: `lib/openzeppelin-contracts/contracts/` (v4.9.3)
-- CREATE3: `lib/isolmate/src/utils/CREATE3.sol`
+- CREATE3: `lib/solady/src/utils/CREATE3.sol`
