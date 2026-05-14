@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.35;
 
 import {SUPRTokenV2} from '../contracts/SUPRTokenV2.sol';
 import {IXERC20Factory} from '../interfaces/IXERC20Factory.sol';

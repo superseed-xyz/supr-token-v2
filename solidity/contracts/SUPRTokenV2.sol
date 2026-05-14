@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.35;
 
 /**
  * @custom:security-contact security@superseed.xyz

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.23;
+pragma solidity 0.8.35;
 
 import {Test} from 'forge-std/Test.sol';
 import {XERC20} from '../../contracts/XERC20.sol';
