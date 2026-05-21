@@ -9,21 +9,20 @@ import {IXERC20} from '../interfaces/IXERC20.sol';
 
 /**
  * @title SUPRConverterDeploy
- * @notice Deploys the SUPRConverter and registers it as a bridge on the new token.
+ * @notice Deploys the SUPRConverter and prints the calldata the governor must execute
+ *         to register it as a bridge on the new token.
  *
  * Prerequisites:
- *   - SUPRTokenV2 must already be deployed (set NEW_TOKEN below)
- *   - DEPLOYER_PRIVATE_KEY must be the current owner of SUPRTokenV2 (governor)
+ *   - SUPRTokenV2 must already be deployed (set NEW_TOKEN_ADDRESS below)
+ *   - Ownership of SUPRTokenV2 has been transferred to the governor (multisig / DAO)
  *
  * Set env vars in .env:
  *   DEPLOYER_PRIVATE_KEY=...
  *   OLD_TOKEN_ADDRESS=<V1 SUPR token address>
  *   NEW_TOKEN_ADDRESS=<deployed SUPRTokenV2 address>
  *
- * The migration limit is set to the total V1 supply (10 billion tokens).
- * When migration is complete, the governor calls:
- *   newSUPR.setLimits(migrationBridge, 0, 0)
- * to permanently close the migrator.
+ * After this script runs, the governor must call setLimits with the printed calldata.
+ * When migration is complete, the governor calls setLimits(migrator, 0, 0) to close it.
  */
 contract SUPRConverterDeploy is Script {
   uint256 internal constant OLD_TOTAL_SUPPLY = 10_000_000_000e18;
