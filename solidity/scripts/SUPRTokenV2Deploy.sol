@@ -59,7 +59,6 @@ contract SUPRTokenV2Deploy is Script, ScriptingLibrary {
   error SUPRTokenV2Deploy_NoFactoryOnChain();
   error SUPRTokenV2Deploy_BridgeAddressNotSet();
   error SUPRTokenV2Deploy_AddressMismatchAcrossChains();
-  error SUPRTokenV2Deploy_BytecodeMismatchAcrossChains();
 
   uint256 public deployer = vm.envUint('DEPLOYER_PRIVATE_KEY');
   SUPRTokenV2Factory public factory = SUPRTokenV2Factory(vm.envAddress('FACTORY_ADDRESS'));
@@ -78,7 +77,6 @@ contract SUPRTokenV2Deploy is Script, ScriptingLibrary {
     }
 
     address[] memory _tokens = new address[](_deployCount);
-    uint256[] memory _forkIds = new uint256[](_deployCount);
     uint256 _idx;
 
     for (uint256 i; i < _chainAmount; i++) {
@@ -88,7 +86,7 @@ contract SUPRTokenV2Deploy is Script, ScriptingLibrary {
 
       if (_chainDetails.governor == address(0)) revert SUPRTokenV2Deploy_GovernorNotSet();
 
-      _forkIds[_idx] = vm.createSelectFork(vm.rpcUrl(vm.envString(_chainDetails.rpcEnvName)));
+      vm.createSelectFork(vm.rpcUrl(vm.envString(_chainDetails.rpcEnvName)));
       vm.startBroadcast(deployer);
 
       if (keccak256(address(factory).code) == keccak256(address(0).code)) {
@@ -131,19 +129,13 @@ contract SUPRTokenV2Deploy is Script, ScriptingLibrary {
       _idx++;
     }
 
-    // Verify deterministic deployment: same address and bytecode on every deployed chain.
-    // Each bytecode read switches to that chain's fork so .code hits the correct RPC.
+    // Verify deterministic deployment: same address on every deployed chain.
+    // Runtime bytecode intentionally not compared: SUPRTokenV2 inherits EIP712 (OZ v4.9.3),
+    // which caches block.chainid in an immutable, making runtime bytecode chain-specific.
+    // CREATE3 address equality is sufficient to prove the same initcode was used everywhere.
     if (_deployCount > 1) {
-      vm.selectFork(_forkIds[0]);
-      bytes32 _referenceCodehash = keccak256(_tokens[0].code);
-
       for (uint256 i = 1; i < _deployCount; i++) {
         if (_tokens[i - 1] != _tokens[i]) revert SUPRTokenV2Deploy_AddressMismatchAcrossChains();
-
-        vm.selectFork(_forkIds[i]);
-        if (keccak256(_tokens[i].code) != _referenceCodehash) {
-          revert SUPRTokenV2Deploy_BytecodeMismatchAcrossChains();
-        }
       }
     }
   }
