@@ -1,3 +1,19 @@
+[profile.default]
+solc = '0.8.35'
+src = 'solidity'
+test = 'solidity/test'
+out = 'out'
+libs = ['lib']
+optimizer_runs = 10_000
+fs_permissions = [{ access = "read-write", path = "./" }]
+
+[profile.optimized]
+via_ir = true
+out = 'out-via-ir'
+
+[profile.docs]
+src = 'solidity/interfaces/'
+
 [fmt]
 line_length = 120
 tab_width = 2
@@ -6,28 +22,26 @@ int_types = 'long'
 quote_style = 'single'
 number_underscore = 'thousands'
 multiline_func_header = 'params_first'
-fs_permissions = [{ access = "read-write", path = "./"}]
+sort_imports = true
 
-[profile.default]
-solc = '0.8.35'
-src = 'solidity'
-test = 'solidity/test'
-out = 'out'
-libs = ['lib']
-fuzz_runs = 1000
-optimizer_runs = 10_000
-fs_permissions = [{ access = "read-write", path = "./"}]
+[fuzz]
+runs = 1000
 
-[profile.optimized]
-via_ir = true
-out = 'out-via-ir'
-fuzz_runs = 5000
-fs_permissions = [{ access = "read-write", path = "./"}]
+[invariant]
+runs = 256
+depth = 128
+fail_on_revert = false
 
-[profile.test]
-via_ir = true
-out = 'out-via-ir'
-fuzz_runs = 5000
-src = 'solidity/test'
-fs_permissions = [{ access = "read-write", path = "./"}]
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC}"
+base = "${BASE_RPC}"
+optimism = "${OPTIMISM_RPC}"
+arbitrum = "${ARBITRUM_RPC}"
+ink = "${INK_RPC}"
+sepolia = "${SEPOLIA_RPC}"
 
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+base = { key = "${BASESCAN_API_KEY}" }
+optimism = { key = "${OPTIMISTIC_ETHERSCAN_API_KEY}" }
+arbitrum = { key = "${ARBISCAN_API_KEY}" }
