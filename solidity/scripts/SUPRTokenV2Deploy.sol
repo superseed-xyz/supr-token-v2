@@ -2,12 +2,11 @@
 pragma solidity 0.8.35;
 
 // solhint-disable-next-line no-console
-import {console} from 'forge-std/console.sol';
-import {Script} from 'forge-std/Script.sol';
-import {stdJson} from 'forge-std/StdJson.sol';
-import {SUPRTokenV2} from '../contracts/SUPRTokenV2.sol';
 import {SUPRTokenV2Factory} from '../contracts/SUPRTokenV2Factory.sol';
 import {ScriptingLibrary} from './ScriptingLibrary/ScriptingLibrary.sol';
+import {Script} from 'forge-std/Script.sol';
+import {stdJson} from 'forge-std/StdJson.sol';
+import {console} from 'forge-std/console.sol';
 
 /// @dev Struct members must be in ALPHABETICAL order — stdJson parses JSON keys
 ///      alphabetically and maps them positionally to struct fields.
@@ -44,8 +43,9 @@ struct DeploymentConfig {
  *
  * Usage:
  *   1. Fill in solidity/scripts/supr-token-v2-deployment-config.json
- *   2. Set DEPLOYER_PRIVATE_KEY, FACTORY_ADDRESS, and all RPC env vars in .env
- *   3. Dry-run:  forge script solidity/scripts/SUPRTokenV2Deploy.sol --via-ir
+ *   2. Set FACTORY_ADDRESS and all RPC env vars in .env; import the deployer keystore
+ *      once with: cast wallet import <name> --interactive
+ *   3. Dry-run:  forge script solidity/scripts/SUPRTokenV2Deploy.sol --account <name>
  *   4. Broadcast: add --broadcast --verify to the command above
  *
  * The factory must already be deployed on every target chain.
@@ -60,7 +60,6 @@ contract SUPRTokenV2Deploy is Script, ScriptingLibrary {
   error SUPRTokenV2Deploy_BridgeAddressNotSet();
   error SUPRTokenV2Deploy_AddressMismatchAcrossChains();
 
-  uint256 public deployer = vm.envUint('DEPLOYER_PRIVATE_KEY');
   SUPRTokenV2Factory public factory = SUPRTokenV2Factory(vm.envAddress('FACTORY_ADDRESS'));
 
   function run() public {
@@ -87,7 +86,8 @@ contract SUPRTokenV2Deploy is Script, ScriptingLibrary {
       if (_chainDetails.governor == address(0)) revert SUPRTokenV2Deploy_GovernorNotSet();
 
       vm.createSelectFork(vm.rpcUrl(vm.envString(_chainDetails.rpcEnvName)));
-      vm.startBroadcast(deployer);
+      // Broadcaster is provided via `--account <keystore>` (no raw private key in env).
+      vm.startBroadcast();
 
       if (keccak256(address(factory).code) == keccak256(address(0).code)) {
         revert SUPRTokenV2Deploy_NoFactoryOnChain();
@@ -105,17 +105,25 @@ contract SUPRTokenV2Deploy is Script, ScriptingLibrary {
         _mintLimits[_b] = _bridgeDetails[_b].mintLimit * 1e18;
       }
 
-      // Deploy the xERC20 token.
-      address _xerc20 = factory.deployXERC20(_data.name, _data.symbol, _mintLimits, _burnLimits, _bridges);
-
-      // Deploy a lockbox only when a canonical ERC20 exists on this chain.
+      // Deploy the token (and lockbox where a canonical ERC20 exists), handing ownership
+      // straight to the governor in the same call. The deployer EOA is never the owner.
+      address _xerc20;
       address _lockbox;
       if (_chainDetails.erc20 != address(0) || _chainDetails.isNativeGasToken) {
-        _lockbox = factory.deployLockbox(_xerc20, _chainDetails.erc20, _chainDetails.isNativeGasToken);
+        (_xerc20, _lockbox) = factory.deployXERC20WithLockbox(
+          _data.name,
+          _data.symbol,
+          _mintLimits,
+          _burnLimits,
+          _bridges,
+          _chainDetails.erc20,
+          _chainDetails.isNativeGasToken,
+          _chainDetails.governor
+        );
+      } else {
+        _xerc20 =
+          factory.deployXERC20(_data.name, _data.symbol, _mintLimits, _burnLimits, _bridges, _chainDetails.governor);
       }
-
-      // Hand ownership to the governor (multisig / DAO).
-      SUPRTokenV2(_xerc20).transferOwnership(_chainDetails.governor);
 
       vm.stopBroadcast();
 

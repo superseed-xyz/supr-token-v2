@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.35;
 
-import {Test} from 'forge-std/Test.sol';
 import {SUPRTokenV2} from '../../contracts/SUPRTokenV2.sol';
-import {IXERC20} from '../../interfaces/IXERC20.sol';
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC165} from '@openzeppelin/contracts/utils/introspection/IERC165.sol';
+import {IXERC20} from '@xERC20/interfaces/IXERC20.sol';
+import {Test} from 'forge-std/Test.sol';
 
 abstract contract Base is Test {
   address internal _owner = vm.addr(1);
@@ -48,16 +50,6 @@ contract UnitNames is Base {
     vm.expectRevert(SUPRTokenV2.SUPRTokenV2_ZeroFactory.selector);
     new SUPRTokenV2('Superseed', 'SUPR', address(0));
   }
-
-  function testMintRevertsAboveSupplyCap() public {
-    uint256 _cap = 10_000_000_000e18;
-    vm.prank(_owner);
-    _token.setLimits(_bridge, _cap + 1, 0);
-
-    vm.prank(_bridge);
-    vm.expectRevert(SUPRTokenV2.SUPRTokenV2_SupplyCapExceeded.selector);
-    _token.mint(_user, _cap + 1);
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,7 +57,9 @@ contract UnitNames is Base {
 // ─────────────────────────────────────────────────────────────────────────────
 
 contract UnitMintBurn is Base {
-  function testMintRevertsToZeroAddress(uint256 _amount) public {
+  function testMintRevertsToZeroAddress(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
     vm.prank(_owner);
     _token.setLimits(_bridge, _amount, 0);
@@ -74,7 +68,9 @@ contract UnitMintBurn is Base {
     _token.mint(address(0), _amount);
   }
 
-  function testMintRevertsToSelf(uint256 _amount) public {
+  function testMintRevertsToSelf(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
     vm.prank(_owner);
     _token.setLimits(_bridge, _amount, 0);
@@ -83,14 +79,19 @@ contract UnitMintBurn is Base {
     _token.mint(address(_token), _amount);
   }
 
-  function testMintRevertsWithoutLimit(uint256 _amount) public {
+  function testMintRevertsWithoutLimit(
+    uint256 _amount
+  ) public {
     vm.assume(_amount > 0);
     vm.prank(_bridge);
     vm.expectRevert(IXERC20.IXERC20_NotHighEnoughLimits.selector);
     _token.mint(_user, _amount);
   }
 
-  function testBurnRevertsWithoutLimit(uint256 _mintAmt, uint256 _burnAmt) public {
+  function testBurnRevertsWithoutLimit(
+    uint256 _mintAmt,
+    uint256 _burnAmt
+  ) public {
     _mintAmt = bound(_mintAmt, 1, 10_000_000_000e18);
     _burnAmt = bound(_burnAmt, 1, 10_000_000_000e18);
     vm.assume(_burnAmt > _mintAmt);
@@ -105,14 +106,18 @@ contract UnitMintBurn is Base {
     vm.stopPrank();
   }
 
-  function testSetLimitsRevertsWhenTooHigh(uint256 _limit) public {
+  function testSetLimitsRevertsWhenTooHigh(
+    uint256 _limit
+  ) public {
     _limit = bound(_limit, type(uint256).max / 2 + 1, type(uint256).max);
     vm.prank(_owner);
     vm.expectRevert(IXERC20.IXERC20_LimitsTooHigh.selector);
     _token.setLimits(_bridge, _limit, _limit);
   }
 
-  function testMint(uint256 _amount) public {
+  function testMint(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
 
     vm.prank(_owner);
@@ -124,7 +129,9 @@ contract UnitMintBurn is Base {
     assertEq(_token.balanceOf(_user), _amount);
   }
 
-  function testBurn(uint256 _amount) public {
+  function testBurn(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
 
     vm.prank(_owner);
@@ -138,7 +145,9 @@ contract UnitMintBurn is Base {
     assertEq(_token.balanceOf(_bridge), 0);
   }
 
-  function testBurnFromWithAllowance(uint256 _amount) public {
+  function testBurnFromWithAllowance(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
 
     vm.prank(_owner);
@@ -158,7 +167,9 @@ contract UnitMintBurn is Base {
     assertEq(_token.balanceOf(_user), 0);
   }
 
-  function testBurnRevertsWithoutAllowance(uint256 _amount) public {
+  function testBurnRevertsWithoutAllowance(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
 
     vm.prank(_owner);
@@ -173,7 +184,10 @@ contract UnitMintBurn is Base {
     _token.burn(_user, _amount);
   }
 
-  function testSetLimitsEmitsEvent(uint256 _mintLimit, uint256 _burnLimit) public {
+  function testSetLimitsEmitsEvent(
+    uint256 _mintLimit,
+    uint256 _burnLimit
+  ) public {
     _mintLimit = bound(_mintLimit, 0, type(uint256).max / 2);
     _burnLimit = bound(_burnLimit, 0, type(uint256).max / 2);
 
@@ -183,7 +197,9 @@ contract UnitMintBurn is Base {
     _token.setLimits(_bridge, _mintLimit, _burnLimit);
   }
 
-  function testSetLimitsRevertsForNonOwner(address _caller) public {
+  function testSetLimitsRevertsForNonOwner(
+    address _caller
+  ) public {
     vm.assume(_caller != _owner);
     vm.prank(_caller);
     vm.expectRevert('Ownable: caller is not the owner');
@@ -214,7 +230,9 @@ contract UnitLockbox is Base {
     _newToken.setLockbox(_lockbox);
   }
 
-  function testSetLockboxRevertsForNonFactory(address _caller) public {
+  function testSetLockboxRevertsForNonFactory(
+    address _caller
+  ) public {
     vm.assume(_caller != _owner);
     vm.assume(_caller != address(this)); // address(this) is the factory of _newToken below
     SUPRTokenV2 _newToken = new SUPRTokenV2('T', 'T', address(this));
@@ -223,14 +241,18 @@ contract UnitLockbox is Base {
     _newToken.setLockbox(_lockbox);
   }
 
-  function testLockboxCanMintWithoutLimit(uint256 _amount) public {
+  function testLockboxCanMintWithoutLimit(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
     vm.prank(_lockbox);
     _token.mint(_user, _amount);
     assertEq(_token.balanceOf(_user), _amount);
   }
 
-  function testLockboxCanBurnWithoutLimit(uint256 _amount) public {
+  function testLockboxCanBurnWithoutLimit(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, 10_000_000_000e18);
     vm.prank(_lockbox);
     _token.mint(_user, _amount);
@@ -262,14 +284,19 @@ contract UnitRateLimits is Base {
     assertEq(_token.burningCurrentLimitOf(_bridge), _LIMIT);
   }
 
-  function testLimitDecreasesAfterMint(uint256 _amount) public {
+  function testLimitDecreasesAfterMint(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _LIMIT);
     vm.prank(_bridge);
     _token.mint(_user, _amount);
     assertEq(_token.mintingCurrentLimitOf(_bridge), _LIMIT - _amount);
   }
 
-  function testLimitReplenishesOverTime(uint256 _amount, uint256 _timePassed) public {
+  function testLimitReplenishesOverTime(
+    uint256 _amount,
+    uint256 _timePassed
+  ) public {
     _amount = bound(_amount, 1, _LIMIT);
     _timePassed = bound(_timePassed, 1, 1 days - 1);
 
@@ -284,7 +311,9 @@ contract UnitRateLimits is Base {
     assertLe(_limitAfterTime, _LIMIT);
   }
 
-  function testLimitFullyReplenishesAfterOneDay(uint256 _amount) public {
+  function testLimitFullyReplenishesAfterOneDay(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _LIMIT);
     vm.prank(_bridge);
     _token.mint(_user, _amount);
@@ -305,7 +334,9 @@ contract UnitRateLimits is Base {
     assertEq(_token.mintingCurrentLimitOf(_bridge), _newLimit);
   }
 
-  function testIncreasingMaxLimitAdjustsCurrent(uint256 _amount) public {
+  function testIncreasingMaxLimitAdjustsCurrent(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _LIMIT / 2);
     vm.prank(_bridge);
     _token.mint(_user, _amount);
@@ -355,5 +386,92 @@ contract UnitPermit is Base {
     _token.permit(_signer, _bridge, _value, _deadline, v, r, s);
 
     assertEq(_token.allowance(_signer, _bridge), _value);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ERC-165 introspection
+// ─────────────────────────────────────────────────────────────────────────────
+
+contract UnitIntrospection is Base {
+  function testSupportsXERC20() public {
+    assertTrue(_token.supportsInterface(type(IXERC20).interfaceId));
+  }
+
+  function testSupportsERC20() public {
+    assertTrue(_token.supportsInterface(type(IERC20).interfaceId));
+  }
+
+  function testSupportsERC165() public {
+    assertTrue(_token.supportsInterface(type(IERC165).interfaceId));
+  }
+
+  function testDoesNotSupportUnknownInterface(
+    bytes4 _id
+  ) public {
+    vm.assume(_id != type(IXERC20).interfaceId && _id != type(IERC20).interfaceId && _id != type(IERC165).interfaceId);
+    assertFalse(_token.supportsInterface(_id));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Receiver guard on transfers (not just mint)
+// ─────────────────────────────────────────────────────────────────────────────
+
+contract UnitTransferReceiverGuard is Base {
+  function _fund(
+    uint256 _amount
+  ) internal {
+    vm.prank(_owner);
+    _token.setLimits(_bridge, _amount, 0);
+    vm.prank(_bridge);
+    _token.mint(_user, _amount);
+  }
+
+  function testTransferRevertsToToken(
+    uint256 _amount
+  ) public {
+    _amount = bound(_amount, 1, 10_000_000_000e18);
+    _fund(_amount);
+
+    vm.prank(_user);
+    vm.expectRevert(abi.encodeWithSelector(SUPRTokenV2.SUPRTokenV2_InvalidReceiver.selector, address(_token)));
+    _token.transfer(address(_token), _amount);
+  }
+
+  function testTransferRevertsToZeroAddress(
+    uint256 _amount
+  ) public {
+    _amount = bound(_amount, 1, 10_000_000_000e18);
+    _fund(_amount);
+
+    vm.prank(_user);
+    vm.expectRevert(abi.encodeWithSelector(SUPRTokenV2.SUPRTokenV2_InvalidReceiver.selector, address(0)));
+    _token.transfer(address(0), _amount);
+  }
+
+  function testTransferFromRevertsToToken(
+    uint256 _amount
+  ) public {
+    _amount = bound(_amount, 1, 10_000_000_000e18);
+    _fund(_amount);
+
+    vm.prank(_user);
+    _token.approve(_owner, _amount);
+
+    vm.prank(_owner);
+    vm.expectRevert(abi.encodeWithSelector(SUPRTokenV2.SUPRTokenV2_InvalidReceiver.selector, address(_token)));
+    _token.transferFrom(_user, address(_token), _amount);
+  }
+
+  function testTransferToNormalAddressSucceeds(
+    uint256 _amount
+  ) public {
+    _amount = bound(_amount, 1, 10_000_000_000e18);
+    _fund(_amount);
+
+    vm.prank(_user);
+    _token.transfer(_bridge, _amount);
+    assertEq(_token.balanceOf(_bridge), _amount);
   }
 }

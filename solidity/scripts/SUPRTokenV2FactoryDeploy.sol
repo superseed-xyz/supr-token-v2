@@ -2,10 +2,10 @@
 pragma solidity 0.8.35;
 
 // solhint-disable-next-line no-console
-import {console} from 'forge-std/console.sol';
-import {Script} from 'forge-std/Script.sol';
 import {SUPRTokenV2Factory} from '../contracts/SUPRTokenV2Factory.sol';
 import {ScriptingLibrary} from './ScriptingLibrary/ScriptingLibrary.sol';
+import {Script} from 'forge-std/Script.sol';
+import {console} from 'forge-std/console.sol';
 
 /**
  * @title SUPRTokenV2FactoryDeploy
@@ -21,14 +21,13 @@ import {ScriptingLibrary} from './ScriptingLibrary/ScriptingLibrary.sol';
  */
 contract SUPRTokenV2FactoryDeploy is Script, ScriptingLibrary {
   // Bump this string for every new factory version to get a fresh address.
-  string public constant SALT = 'SUPRTokenV2Factory-v1.1';
-
-  uint256 public deployerPk = vm.envUint('DEPLOYER_PRIVATE_KEY');
+  string public constant SALT = 'SUPRTokenV2Factory-v1.2';
 
   function run() public {
+    // Broadcaster is provided via `--account <keystore>` (no raw private key in env).
     bytes32 _salt = keccak256(abi.encodePacked(SALT, msg.sender));
 
-    vm.startBroadcast(deployerPk);
+    vm.startBroadcast();
     SUPRTokenV2Factory _factory = new SUPRTokenV2Factory{salt: _salt}();
     vm.stopBroadcast();
 

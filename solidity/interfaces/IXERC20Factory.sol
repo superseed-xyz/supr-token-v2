@@ -44,6 +44,7 @@ interface IXERC20Factory {
    * @param _minterLimits The array of minter limits that you are adding (optional, can be an empty array)
    * @param _burnerLimits The array of burning limits that you are adding (optional, can be an empty array)
    * @param _bridges The array of burners that you are adding (optional, can be an empty array)
+   * @param _owner The address that will own the token after deployment
    * @return _xerc20 The address of the xerc20
    */
   function deployXERC20(
@@ -51,8 +52,34 @@ interface IXERC20Factory {
     string memory _symbol,
     uint256[] memory _minterLimits,
     uint256[] memory _burnerLimits,
-    address[] memory _bridges
+    address[] memory _bridges,
+    address _owner
   ) external returns (address _xerc20);
+
+  /**
+   * @notice Atomically deploys an XERC20 and its XERC20Lockbox, then transfers ownership
+   *
+   * @param _name The name of the token
+   * @param _symbol The symbol of the token
+   * @param _minterLimits The array of minter limits that you are adding (optional, can be an empty array)
+   * @param _burnerLimits The array of burning limits that you are adding (optional, can be an empty array)
+   * @param _bridges The array of bridges that you are adding (optional, can be an empty array)
+   * @param _baseToken The address of the base token that you want to lock (address(0) if native)
+   * @param _isNative Whether or not the base token is native
+   * @param _owner The address that will own the token after deployment
+   * @return _xerc20 The address of the xerc20
+   * @return _lockbox The address of the lockbox
+   */
+  function deployXERC20WithLockbox(
+    string memory _name,
+    string memory _symbol,
+    uint256[] memory _minterLimits,
+    uint256[] memory _burnerLimits,
+    address[] memory _bridges,
+    address _baseToken,
+    bool _isNative,
+    address _owner
+  ) external returns (address _xerc20, address payable _lockbox);
 
   /**
    * @notice Deploys an XERC20Lockbox contract using CREATE3

@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.35;
 
-import {Test} from 'forge-std/Test.sol';
-import {XERC20} from '../../contracts/XERC20.sol';
-import {SUPRTokenV2} from '../../contracts/SUPRTokenV2.sol';
 import {SUPRConverter} from '../../contracts/SUPRConverter.sol';
+import {SUPRTokenV2} from '../../contracts/SUPRTokenV2.sol';
+import {XERC20} from '@xERC20/contracts/XERC20.sol';
+import {Test} from 'forge-std/Test.sol';
 
 /// @dev Stand-in for the V1 SUPR token. V1 SUPR is itself an xERC20 (CrosschainERC20 on
 ///      mainnet), so it exposes the rate-limited burn(address,uint256) that SUPRConverter
 ///      relies on — a plain ERC20Burnable (burn(uint256)) would not match that call.
 contract MockOldSUPR is XERC20 {
-  constructor(address _owner) XERC20('Superseed', 'SUPR', _owner) {}
+  constructor(
+    address _owner
+  ) XERC20('Superseed', 'SUPR', _owner) {}
 
-  /// @dev Permissionless mint for test funding — bypasses rate limits.
-  function mint(address to, uint256 amount) public override {
+  /// @dev Permissionless test-only funding helper — bypasses the rate-limited mint().
+  function freeMint(
+    address to,
+    uint256 amount
+  ) public {
     _mint(to, amount);
   }
 }
@@ -28,26 +33,26 @@ abstract contract Base is Test {
 
   MockOldSUPR internal _oldSupr;
   SUPRTokenV2 internal _newSupr;
-  SUPRConverter internal _migrator;
+  SUPRConverter internal _converter;
 
-  event Migrated(address indexed from, address indexed to, uint256 amount);
+  event Converted(address indexed from, address indexed to, uint256 amount);
 
   function setUp() public virtual {
     // Deploy old token (xERC20, governor-owned) and fund user
     _oldSupr = new MockOldSUPR(_governor);
-    _oldSupr.mint(_user, _MINT_AMT);
+    _oldSupr.freeMint(_user, _MINT_AMT);
 
     // Deploy new token (governor owns it)
     vm.prank(_governor);
     _newSupr = new SUPRTokenV2('Superseed', 'SUPR', _governor);
 
-    // Deploy migrator
-    _migrator = new SUPRConverter(address(_oldSupr), address(_newSupr));
+    // Deploy converter
+    _converter = new SUPRConverter(address(_oldSupr), address(_newSupr));
 
-    // Register migrator: burner on old SUPR, minter on new SUPR.
+    // Register converter: burner on old SUPR, minter on new SUPR.
     vm.startPrank(_governor);
-    _oldSupr.setLimits(address(_migrator), 0, _BRIDGE_LIMIT);
-    _newSupr.setLimits(address(_migrator), _BRIDGE_LIMIT, 0);
+    _oldSupr.setLimits(address(_converter), 0, _BRIDGE_LIMIT);
+    _newSupr.setLimits(address(_converter), _BRIDGE_LIMIT, 0);
     vm.stopPrank();
   }
 }
@@ -58,8 +63,8 @@ abstract contract Base is Test {
 
 contract UnitConstructor is Base {
   function testImmutables() public {
-    assertEq(address(_migrator.OLD_TOKEN()), address(_oldSupr));
-    assertEq(address(_migrator.NEW_TOKEN()), address(_newSupr));
+    assertEq(address(_converter.OLD_TOKEN()), address(_oldSupr));
+    assertEq(address(_converter.NEW_TOKEN()), address(_newSupr));
   }
 
   function testRevertsOnZeroOldAddress() public {
@@ -74,19 +79,21 @@ contract UnitConstructor is Base {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// migrate()
+// convert()
 // ─────────────────────────────────────────────────────────────────────────────
 
-contract UnitMigrate is Base {
-  function testMigrateBurnsOldAndMintsNew(uint256 _amount) public {
+contract UnitConvert is Base {
+  function testConvertBurnsOldAndMintsNew(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _MINT_AMT);
-    _oldSupr.mint(_user, 0); // ensure supply known
+    _oldSupr.freeMint(_user, 0); // ensure supply known
 
     uint256 _oldTotalSupplyBefore = _oldSupr.totalSupply();
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _amount);
-    _migrator.migrate(_amount);
+    _oldSupr.approve(address(_converter), _amount);
+    _converter.convert(_amount);
     vm.stopPrank();
 
     // Old tokens are really burned — totalSupply decreases
@@ -97,38 +104,44 @@ contract UnitMigrate is Base {
     assertEq(_newSupr.balanceOf(_user), _amount);
   }
 
-  function testMigrateEmitsEvent(uint256 _amount) public {
+  function testConvertEmitsEvent(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _MINT_AMT);
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _amount);
+    _oldSupr.approve(address(_converter), _amount);
 
     vm.expectEmit(true, true, true, true);
-    emit Migrated(_user, _user, _amount);
-    _migrator.migrate(_amount);
+    emit Converted(_user, _user, _amount);
+    _converter.convert(_amount);
     vm.stopPrank();
   }
 
-  function testMigrateRevertsWithoutApproval(uint256 _amount) public {
+  function testConvertRevertsWithoutApproval(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _MINT_AMT);
     vm.prank(_user);
     vm.expectRevert();
-    _migrator.migrate(_amount);
+    _converter.convert(_amount);
   }
 
-  function testMigrateRevertsWithInsufficientBalance(uint256 _amount) public {
+  function testConvertRevertsWithInsufficientBalance(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, _MINT_AMT + 1, type(uint128).max);
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _amount);
+    _oldSupr.approve(address(_converter), _amount);
     vm.expectRevert();
-    _migrator.migrate(_amount);
+    _converter.convert(_amount);
     vm.stopPrank();
   }
 
-  function testFullMigration() public {
+  function testFullConversion() public {
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _MINT_AMT);
-    _migrator.migrate(_MINT_AMT);
+    _oldSupr.approve(address(_converter), _MINT_AMT);
+    _converter.convert(_MINT_AMT);
     vm.stopPrank();
 
     assertEq(_oldSupr.balanceOf(_user), 0);
@@ -138,44 +151,46 @@ contract UnitMigrate is Base {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// migrateAll()
+// convertAll()
 // ─────────────────────────────────────────────────────────────────────────────
 
-contract UnitMigrateAll is Base {
-  function testMigrateAllBurnsFullBalance() public {
+contract UnitConvertAll is Base {
+  function testConvertAllBurnsFullBalance() public {
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), type(uint256).max);
-    _migrator.migrateAll();
+    _oldSupr.approve(address(_converter), type(uint256).max);
+    _converter.convertAll();
     vm.stopPrank();
 
     assertEq(_oldSupr.balanceOf(_user), 0);
     assertEq(_newSupr.balanceOf(_user), _MINT_AMT);
   }
 
-  function testMigrateAllEmitsEvent() public {
+  function testConvertAllEmitsEvent() public {
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), type(uint256).max);
+    _oldSupr.approve(address(_converter), type(uint256).max);
 
     vm.expectEmit(true, true, true, true);
-    emit Migrated(_user, _user, _MINT_AMT);
-    _migrator.migrateAll();
+    emit Converted(_user, _user, _MINT_AMT);
+    _converter.convertAll();
     vm.stopPrank();
   }
 
-  function testMigrateAllRevertsWithoutApproval() public {
+  function testConvertAllRevertsWithoutApproval() public {
     vm.prank(_user);
     vm.expectRevert();
-    _migrator.migrateAll();
+    _converter.convertAll();
   }
 
-  function testMigrateAllWithVariableBalance(uint256 _extra) public {
+  function testConvertAllWithVariableBalance(
+    uint256 _extra
+  ) public {
     _extra = bound(_extra, 0, _BRIDGE_LIMIT - _MINT_AMT);
-    _oldSupr.mint(_user, _extra);
+    _oldSupr.freeMint(_user, _extra);
     uint256 _expected = _MINT_AMT + _extra;
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), type(uint256).max);
-    _migrator.migrateAll();
+    _oldSupr.approve(address(_converter), type(uint256).max);
+    _converter.convertAll();
     vm.stopPrank();
 
     assertEq(_oldSupr.balanceOf(_user), 0);
@@ -184,16 +199,18 @@ contract UnitMigrateAll is Base {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// migrateTo()
+// convertTo()
 // ─────────────────────────────────────────────────────────────────────────────
 
-contract UnitMigrateTo is Base {
-  function testMigrateToSendsNewTokensToRecipient(uint256 _amount) public {
+contract UnitConvertTo is Base {
+  function testConvertToSendsNewTokensToRecipient(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _MINT_AMT);
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _amount);
-    _migrator.migrateTo(_recipient, _amount);
+    _oldSupr.approve(address(_converter), _amount);
+    _converter.convertTo(_recipient, _amount);
     vm.stopPrank();
 
     // Old SUPR burned from caller
@@ -203,15 +220,17 @@ contract UnitMigrateTo is Base {
     assertEq(_newSupr.balanceOf(_user), 0);
   }
 
-  function testMigrateToEmitsEvent(uint256 _amount) public {
+  function testConvertToEmitsEvent(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _MINT_AMT);
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _amount);
+    _oldSupr.approve(address(_converter), _amount);
 
     vm.expectEmit(true, true, true, true);
-    emit Migrated(_user, _recipient, _amount);
-    _migrator.migrateTo(_recipient, _amount);
+    emit Converted(_user, _recipient, _amount);
+    _converter.convertTo(_recipient, _amount);
     vm.stopPrank();
   }
 }
@@ -221,39 +240,41 @@ contract UnitMigrateTo is Base {
 // ─────────────────────────────────────────────────────────────────────────────
 
 contract UnitBridgeLimit is Base {
-  function testMigrateRevertsWhenBridgeLimitExceeded() public {
+  function testConvertRevertsWhenBridgeLimitExceeded() public {
     // Give user more old SUPR than the bridge limit allows
     uint256 _overLimit = _BRIDGE_LIMIT + 1;
-    _oldSupr.mint(_user, _overLimit);
+    _oldSupr.freeMint(_user, _overLimit);
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _overLimit);
+    _oldSupr.approve(address(_converter), _overLimit);
     vm.expectRevert();
-    _migrator.migrate(_overLimit);
+    _converter.convert(_overLimit);
     vm.stopPrank();
   }
 
-  function testMigrateRevertsAfterLimitSetToZero() public {
-    // Governor disables migration
+  function testConvertRevertsAfterLimitSetToZero() public {
+    // Governor disables conversion
     vm.prank(_governor);
-    _newSupr.setLimits(address(_migrator), 0, 0);
+    _newSupr.setLimits(address(_converter), 0, 0);
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _MINT_AMT);
+    _oldSupr.approve(address(_converter), _MINT_AMT);
     vm.expectRevert();
-    _migrator.migrate(_MINT_AMT);
+    _converter.convert(_MINT_AMT);
     vm.stopPrank();
   }
 
-  function testMigrateConsumesLimit(uint256 _amount) public {
+  function testConvertConsumesLimit(
+    uint256 _amount
+  ) public {
     _amount = bound(_amount, 1, _MINT_AMT);
 
     vm.startPrank(_user);
-    _oldSupr.approve(address(_migrator), _amount);
-    _migrator.migrate(_amount);
+    _oldSupr.approve(address(_converter), _amount);
+    _converter.convert(_amount);
     vm.stopPrank();
 
     assertEq(_newSupr.balanceOf(_user), _amount);
-    assertEq(_newSupr.mintingCurrentLimitOf(address(_migrator)), _BRIDGE_LIMIT - _amount);
+    assertEq(_newSupr.mintingCurrentLimitOf(address(_converter)), _BRIDGE_LIMIT - _amount);
   }
 }
