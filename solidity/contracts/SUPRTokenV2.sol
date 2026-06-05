@@ -9,8 +9,9 @@ pragma solidity 0.8.35;
  *         Extends the canonical defi-wonderland/xERC20 library (lib/xERC20) for all
  *         cross-chain bridge rate-limiting. SUPR-specific additions:
  *           - Zero-address factory guard in the constructor.
- *           - Receiver validity check on every mint and transfer (no sending to
- *             address(0) or the token contract itself).
+ *           - Receiver guard on every token movement, via a single
+ *             _beforeTokenTransfer hook: the token contract itself cannot receive.
+ *             address(0) is already blocked by OpenZeppelin's ERC20.
  *           - ERC-165 introspection advertising the xERC20 / ERC20 interfaces.
  *
  *         Global supply is bounded by the per-bridge mint limits (EIP-7281
@@ -46,29 +47,16 @@ contract SUPRTokenV2 is XERC20, IERC165 {
       || _interfaceId == type(IERC165).interfaceId;
   }
 
-  /// @dev Receiver guard on every mint (bridge mints route here via _mintWithCaller).
-  function _mint(
+  /// @dev Single receiver guard on every token movement. Mint (incl. bridge mints
+  ///      via _mintWithCaller), transfer and transferFrom all route through OZ's
+  ///      _beforeTokenTransfer hook, so blocking the token contract itself here
+  ///      covers every path. The zero address is already rejected by OpenZeppelin's
+  ///      ERC20; burns (to == address(0)) are unaffected.
+  function _beforeTokenTransfer(
+    address, /* from */
     address to,
-    uint256 amount
-  ) internal override {
-    _receiverCheck(to);
-    super._mint(to, amount);
-  }
-
-  /// @dev Receiver guard on every transfer (covers transfer and transferFrom).
-  function _transfer(
-    address from,
-    address to,
-    uint256 amount
-  ) internal override {
-    _receiverCheck(to);
-    super._transfer(from, to, amount);
-  }
-
-  /// @dev Prevents tokens being sent to the zero address or the token contract itself.
-  function _receiverCheck(
-    address to
-  ) internal view {
-    if (to == address(0) || to == address(this)) revert SUPRTokenV2_InvalidReceiver(to);
+    uint256 /* amount */
+  ) internal view override {
+    if (to == address(this)) revert SUPRTokenV2_InvalidReceiver(to);
   }
 }

@@ -64,7 +64,7 @@ contract UnitMintBurn is Base {
     vm.prank(_owner);
     _token.setLimits(_bridge, _amount, 0);
     vm.prank(_bridge);
-    vm.expectRevert(abi.encodeWithSelector(SUPRTokenV2.SUPRTokenV2_InvalidReceiver.selector, address(0)));
+    vm.expectRevert('ERC20: mint to the zero address');
     _token.mint(address(0), _amount);
   }
 
@@ -446,7 +446,7 @@ contract UnitTransferReceiverGuard is Base {
     _fund(_amount);
 
     vm.prank(_user);
-    vm.expectRevert(abi.encodeWithSelector(SUPRTokenV2.SUPRTokenV2_InvalidReceiver.selector, address(0)));
+    vm.expectRevert('ERC20: transfer to the zero address');
     _token.transfer(address(0), _amount);
   }
 
