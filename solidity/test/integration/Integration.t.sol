@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.35;
 
+import {LobsterToken} from '../../contracts/LobsterToken.sol';
+import {LobsterTokenFactory} from '../../contracts/LobsterTokenFactory.sol';
 import {SUPRConverter} from '../../contracts/SUPRConverter.sol';
 import {SUPRTokenV2} from '../../contracts/SUPRTokenV2.sol';
 import {SUPRTokenV2Factory} from '../../contracts/SUPRTokenV2Factory.sol';
@@ -181,58 +183,101 @@ contract IntegrationLockbox is IntegrationBase {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Conversion: old xERC20 SUPR → converter → new SUPR (via factory)
+// Conversion: old SUPR (SUPR0) → converter → split of new SUPR (SUPR1) + BUILD
+// (both new tokens deployed via their respective CREATE3 factories)
 // ─────────────────────────────────────────────────────────────────────────────
 
 contract IntegrationConversion is IntegrationBase {
   MockOldSUPR internal _old;
   SUPRTokenV2 internal _new;
+  LobsterToken internal _build;
+  LobsterTokenFactory internal _lobsterFactory;
   SUPRConverter internal _converter;
 
-  uint256 internal constant _BRIDGE_LIMIT = 10_000_000_000e18;
+  uint256 internal constant _BRIDGE_LIMIT = 100_000_000_000e18; // ≥ max BUILD mintable
+  uint256 internal constant _OLD_FUNDED = 1000e18;
+  uint256 internal constant _SUPR0_PER_SUPR1 = 10_000;
+  uint256 internal constant _BUILD_PER_SUPR0 = 10;
 
   function setUp() public override {
     super.setUp();
 
-    // V1 SUPR (xERC20), governor-owned.
+    // SUPR0 (xERC20), governor-owned.
     _old = new MockOldSUPR(_governor);
-    _old.freeMint(_user, 1000e18);
+    _old.freeMint(_user, _OLD_FUNDED);
 
-    // V2 SUPR via the factory, owned by the governor.
     (uint256[] memory _u, address[] memory _a) = _empty();
+
+    // SUPR1 via the SUPR factory, owned by the governor.
     vm.prank(_deployer);
     _new = SUPRTokenV2(_factory.deployXERC20('Superseed', 'SUPR', _u, _u, _a, _governor));
 
-    // Converter wired as burner on V1 and minter on V2.
-    _converter = new SUPRConverter(address(_old), address(_new));
+    // BUILD via the Lobster factory, owned by the governor.
+    _lobsterFactory = new LobsterTokenFactory();
+    vm.prank(_deployer);
+    _build = LobsterToken(_lobsterFactory.deployXERC20('Lobsters', 'BUILD', _u, _u, _a, _governor));
+
+    // Converter wired as burner on SUPR0 and minter on SUPR1 and BUILD.
+    _converter = new SUPRConverter(address(_old), address(_new), address(_build));
     vm.startPrank(_governor);
     _old.setLimits(address(_converter), 0, _BRIDGE_LIMIT);
     _new.setLimits(address(_converter), _BRIDGE_LIMIT, 0);
+    _build.setLimits(address(_converter), _BRIDGE_LIMIT, 0);
     vm.stopPrank();
   }
 
-  function testFullConversionRoundsTrip() public {
+  function testSplitConversionMintsBothTokens() public {
+    // 60% to SUPR1, 40% to BUILD.
     vm.startPrank(_user);
-    _old.approve(address(_converter), 1000e18);
-    _converter.convert(1000e18);
+    _old.approve(address(_converter), _OLD_FUNDED);
+    _converter.convert(_OLD_FUNDED, 6000);
     vm.stopPrank();
 
-    // V1 burned, V2 minted 1:1.
+    uint256 _supr0ToSupr = (_OLD_FUNDED * 6000) / 10_000;
+    uint256 _supr0ToBuild = _OLD_FUNDED - _supr0ToSupr;
+
+    // SUPR0 fully burned.
     assertEq(_old.balanceOf(_user), 0);
     assertEq(_old.totalSupply(), 0);
-    assertEq(_new.balanceOf(_user), 1000e18);
-    assertEq(_new.totalSupply(), 1000e18);
+
+    // SUPR1 + BUILD minted at their respective rates.
+    assertEq(_new.balanceOf(_user), _supr0ToSupr / _SUPR0_PER_SUPR1);
+    assertEq(_build.balanceOf(_user), _supr0ToBuild * _BUILD_PER_SUPR0);
+  }
+
+  function testFullToSuprConversion() public {
+    vm.startPrank(_user);
+    _old.approve(address(_converter), _OLD_FUNDED);
+    _converter.convert(_OLD_FUNDED, 10_000); // 100% → SUPR1
+    vm.stopPrank();
+
+    assertEq(_new.balanceOf(_user), _OLD_FUNDED / _SUPR0_PER_SUPR1);
+    assertEq(_build.balanceOf(_user), 0);
+    assertEq(_old.totalSupply(), 0);
+  }
+
+  function testFullToBuildConversion() public {
+    vm.startPrank(_user);
+    _old.approve(address(_converter), _OLD_FUNDED);
+    _converter.convert(_OLD_FUNDED, 0); // 100% → BUILD
+    vm.stopPrank();
+
+    assertEq(_build.balanceOf(_user), _OLD_FUNDED * _BUILD_PER_SUPR0);
+    assertEq(_new.balanceOf(_user), 0);
+    assertEq(_old.totalSupply(), 0);
   }
 
   function testConversionClosedByGovernor() public {
-    // Governor closes conversion permanently.
-    vm.prank(_governor);
+    // Governor closes conversion permanently by zeroing both mint limits.
+    vm.startPrank(_governor);
     _new.setLimits(address(_converter), 0, 0);
+    _build.setLimits(address(_converter), 0, 0);
+    vm.stopPrank();
 
     vm.startPrank(_user);
-    _old.approve(address(_converter), 1000e18);
+    _old.approve(address(_converter), _OLD_FUNDED);
     vm.expectRevert();
-    _converter.convert(1000e18);
+    _converter.convert(_OLD_FUNDED, 5000);
     vm.stopPrank();
   }
 }

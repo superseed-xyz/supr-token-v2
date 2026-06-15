@@ -1,0 +1,78 @@
+{
+  "name": "Lobsters",
+  "symbol": "BUILD",
+  "chainDetails": [
+    {
+      "deploy": false,
+      "rpcEnvName": "MAINNET_RPC",
+      "erc20": "0x0000000000000000000000000000000000000000",
+      "governor": "0x0000000000000000000000000000000000000000",
+      "isNativeGasToken": false,
+      "bridgeDetails": []
+    },
+    {
+      "deploy": false,
+      "rpcEnvName": "BASE_RPC",
+      "erc20": "0x0000000000000000000000000000000000000000",
+      "governor": "0x0000000000000000000000000000000000000000",
+      "isNativeGasToken": false,
+      "bridgeDetails": [
+        {
+          "bridge": "0x0000000000000000000000000000000000000000",
+          "burnLimit": 10000000,
+          "mintLimit": 10000000
+        }
+      ]
+    },
+    {
+      "deploy": true,
+      "rpcEnvName": "ETHEREUM_SEPOLIA_RPC",
+      "erc20": "0x0000000000000000000000000000000000000000",
+      "governor": "0x87a77D4163a43EA33410fb4f6425650934571E07",
+      "isNativeGasToken": false,
+      "bridgeDetails": []
+    },
+    {
+      "deploy": false,
+      "rpcEnvName": "OPTIMISM_RPC",
+      "erc20": "0x0000000000000000000000000000000000000000",
+      "governor": "0x0000000000000000000000000000000000000000",
+      "isNativeGasToken": false,
+      "bridgeDetails": [
+        {
+          "bridge": "0x0000000000000000000000000000000000000000",
+          "burnLimit": 10000000,
+          "mintLimit": 10000000
+        }
+      ]
+    },
+    {
+      "deploy": false,
+      "rpcEnvName": "ARBITRUM_RPC",
+      "erc20": "0x0000000000000000000000000000000000000000",
+      "governor": "0x0000000000000000000000000000000000000000",
+      "isNativeGasToken": false,
+      "bridgeDetails": [
+        {
+          "bridge": "0x0000000000000000000000000000000000000000",
+          "burnLimit": 10000000,
+          "mintLimit": 10000000
+        }
+      ]
+    },
+    {
+      "deploy": false,
+      "rpcEnvName": "INK_RPC",
+      "erc20": "0x0000000000000000000000000000000000000000",
+      "governor": "0x0000000000000000000000000000000000000000",
+      "isNativeGasToken": false,
+      "bridgeDetails": [
+        {
+          "bridge": "0x0000000000000000000000000000000000000000",
+          "burnLimit": 10000000,
+          "mintLimit": 10000000
+        }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,8 @@
     "coverage": "forge coverage --report summary --report lcov --match-path 'solidity/test/unit/*'",
     "deploy:factory": "bash -c 'source .env && forge script SUPRTokenV2FactoryDeploy --rpc-url $RPC_URL --account $DEPLOYER_NAME --broadcast --verify -vvvv'",
     "deploy:token": "bash -c 'source .env && forge script SUPRTokenV2Deploy --account $DEPLOYER_NAME --broadcast --verify --slow -vvvv'",
+    "deploy:lobster-factory": "bash -c 'source .env && forge script LobsterTokenFactoryDeploy --rpc-url $RPC_URL --account $DEPLOYER_NAME --broadcast --verify -vvvv'",
+    "deploy:lobster-token": "bash -c 'source .env && forge script LobsterTokenDeploy --account $DEPLOYER_NAME --broadcast --verify --slow -vvvv'",
     "deploy:converter": "bash -c 'source .env && forge script SUPRConverterDeploy --rpc-url $RPC_URL --account $DEPLOYER_NAME --broadcast --verify -vvvv'",
     "lint:check": "yarn lint:sol-tests && yarn lint:sol-logic && forge fmt --check",
     "lint:fix": "sort-package-json && forge fmt && yarn lint:sol-tests --fix && yarn lint:sol-logic --fix",
