@@ -102,7 +102,7 @@ contract SUPRTokenV2Invariants is Test {
   address internal _owner = vm.addr(0xA11CE);
 
   function setUp() public {
-    _token = new SUPRTokenV2('Superseed', 'SUPR', _owner);
+    _token = new SUPRTokenV2(_owner);
 
     address[] memory _bridges = new address[](2);
     _bridges[0] = vm.addr(0xB1);

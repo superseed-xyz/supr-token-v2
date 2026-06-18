@@ -8,9 +8,8 @@ pragma solidity 0.8.35;
  *
  *         Structurally identical to SUPRTokenV2: it extends the canonical
  *         defi-wonderland/xERC20 library (lib/xERC20) for all cross-chain bridge
- *         rate-limiting. The on-chain name ("Lobsters") and symbol ("BUILD") are
- *         supplied at deploy time via the constructor, so the same code can be
- *         deployed deterministically across chains by LobsterTokenFactory.
+ *         rate-limiting. The on-chain name ("Lobsters") and symbol ("BUILD") are baked
+ *         into the contract rather than passed at deploy time.
  *
  *         BUILD-specific additions (mirrored from SUPRTokenV2):
  *           - Zero-address factory guard in the constructor.
@@ -36,11 +35,17 @@ contract LobsterToken is XERC20, IERC165 {
   error LobsterToken_InvalidReceiver(address receiver);
   error LobsterToken_ZeroFactory();
 
+  /// @notice Token name — baked into the contract, not a deploy-time argument.
+  string private constant _NAME = 'Lobsters';
+  /// @notice Token symbol — baked into the contract, not a deploy-time argument.
+  string private constant _SYMBOL = 'BUILD';
+
+  /// @param _factory Address allowed to set the lockbox (immutable FACTORY) and the token's
+  ///        initial owner. Deploy scripts pass the broadcaster, which then hands ownership to
+  ///        the governor.
   constructor(
-    string memory _name,
-    string memory _symbol,
     address _factory
-  ) XERC20(_name, _symbol, _factory) {
+  ) XERC20(_NAME, _SYMBOL, _factory) {
     if (_factory == address(0)) revert LobsterToken_ZeroFactory();
   }
 

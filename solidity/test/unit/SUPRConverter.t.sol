@@ -51,8 +51,8 @@ abstract contract Base is Test {
 
     // Deploy SUPR1 and BUILD (governor owns both).
     vm.startPrank(_governor);
-    _newSupr = new SUPRTokenV2('Superseed', 'SUPR', _governor);
-    _build = new LobsterToken('Lobsters', 'BUILD', _governor);
+    _newSupr = new SUPRTokenV2(_governor);
+    _build = new LobsterToken(_governor);
     vm.stopPrank();
 
     // Deploy converter.

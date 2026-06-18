@@ -20,7 +20,7 @@ abstract contract Base is Test {
 
   function setUp() public virtual {
     vm.startPrank(_owner);
-    _token = new LobsterToken('Lobsters', 'BUILD', _owner);
+    _token = new LobsterToken(_owner);
     vm.stopPrank();
   }
 }
@@ -48,7 +48,7 @@ contract UnitLobsterNames is Base {
 
   function testConstructorRevertsOnZeroFactory() public {
     vm.expectRevert(LobsterToken.LobsterToken_ZeroFactory.selector);
-    new LobsterToken('Lobsters', 'BUILD', address(0));
+    new LobsterToken(address(0));
   }
 }
 
@@ -224,7 +224,7 @@ contract UnitLobsterLockbox is Base {
   }
 
   function testSetLockboxEmitsEvent() public {
-    LobsterToken _newToken = new LobsterToken('T', 'T', address(this));
+    LobsterToken _newToken = new LobsterToken(address(this));
     vm.expectEmit(true, true, true, true);
     emit LockboxSet(_lockbox);
     _newToken.setLockbox(_lockbox);
@@ -235,7 +235,7 @@ contract UnitLobsterLockbox is Base {
   ) public {
     vm.assume(_caller != _owner);
     vm.assume(_caller != address(this)); // address(this) is the factory of _newToken below
-    LobsterToken _newToken = new LobsterToken('T', 'T', address(this));
+    LobsterToken _newToken = new LobsterToken(address(this));
     vm.prank(_caller);
     vm.expectRevert(IXERC20.IXERC20_NotFactory.selector);
     _newToken.setLockbox(_lockbox);

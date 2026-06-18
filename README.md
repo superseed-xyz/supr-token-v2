@@ -93,101 +93,78 @@ Example:
 - Incorrect: `123abc...`
 ```
 
-You will need to set your custom `name` and `symbol` for your XERC20 to be deployed, no need to add an 'x' infront of it, the contract will do that for you. For more details check the section below.
+The token **name** and **symbol** are baked into each contract — `SUPRTokenV2` is `Superseed` / `SUPR` and `LobsterToken` is `Lobsters` / `BUILD` — so there is nothing to configure for those. The only deploy-time input is `GOVERNOR_ADDRESS` (plus the optional lockbox settings below), set in your `.env`.
 
-## Setup Guide to Deploy an xERC20 Token
+## Setup Guide to Deploy a Token
 
-This guide provides a detailed, step-by-step process to deploy an xERC20 token using this repository. We will first demonstrate how to deploy the xERC20 token alone, and then we’ll cover the scenario in which you want to deploy both the xERC20 token and the lockbox.
-
-## Deploying xERC20 Without the Lockbox
+This guide walks through deploying one of the tokens. There is no deployment config file: the deploy scripts take their inputs from `.env`. First we deploy the token alone, then we cover the case where you also want a lockbox.
 
 > [!IMPORTANT]
 > Verifying contracts deployed with --via-ir is not working correctly with Foundry.
 > Read the following post for a solution: https://github.com/foundry-rs/foundry/issues/3507#issuecomment-1465382107
 
-### 1. Navigate to the XERC20Deploy Script
+### 1. Configure `.env`
 
-Locate and open the `XERC20Deploy.sol` file, which should be situated within the `solidity/scripts` directory.
+Set the keystore account, the RPC for the target chain, and the governor that will own the token:
 
-### 2. Configure the Target Chains
+```
+DEPLOYER_NAME=<your imported keystore account>
+RPC_URL=<rpc for the target chain>
+GOVERNOR_ADDRESS=<address that will own the token after deployment>
+```
 
-Ensure that you have the corresponding RPC URLs added in your .env file to support these networks. Refer to this section for more information on setting up your environment variables.
+The deployer (broadcaster) is only transiently the token's `FACTORY` and initial owner; the script transfers ownership to `GOVERNOR_ADDRESS` before it finishes, so the deployer EOA is never the final owner.
 
-### 3. Decide which Chains need a Lockbox
+### 2. (Optional) Deploy with a Lockbox
 
-Identify the blockchain networks where your token is already deployed and has a canonical representation. On these specific networks, a Lockbox will be required to facilitate interactions. The Lockbox is a contract wrapper that allows users to make the swap between xERC20<->ERC20 1:1. To deploy a lockbox you will need to configure the `erc20` value in the deployment config. This value should be the address of the canonical representation of the token in that chain. Using this value means that a lockbox will be deployed.
+A lockbox lets users swap the canonical ERC20 ⇄ the xERC20 1:1, and is only needed on a chain where the token already has a canonical representation. To deploy one alongside the token, also set:
 
-If you don't need a lockbox for a chain specify `"erc20": "0x0000000000000000000000000000000000000000",`.
-
-### 4. Update the deployment config
-
-Decide on which blockchains you want to deploy your token and the initial configs for the bridges. After that, update the config file located in `/solidity/scripts/xerc20-deployment-config.json`:
+```
+BASE_TOKEN_ADDRESS=<canonical ERC20 to wrap>
+```
 
 > [!CAUTION]
-> isNativeGasToken should only be true if the canonical representation of the token is the native gas token of the chain.
-> Ex: ETH for ethereum or MATIC for polygon.
+> Leave `BASE_TOKEN_ADDRESS` empty on chains with no canonical token. Set `IS_NATIVE_GAS_TOKEN=true` only when the canonical representation is the chain's native gas token (e.g. ETH on Ethereum); in that case leave `BASE_TOKEN_ADDRESS` empty.
 
-```js
-{
-    "name": "Test", // The name of your xERC20.
-    "symbol": "TST", // The symbol of your xERC20.
-    "chainDetails": [ // The chains that the xERC20 token will be deployed to.
-        {
-            "rpcEnvName": "ETHEREUM_GOERLI_RPC", // The name of the RPC to use. It should be added in the .env file.
-            "erc20": "0x0000000000000000000000000000000000000001", // The address of the canonical token representation for that chain. A lockbox will be deployed pairing the deployed xERC20 with the specified ERC20 1:1. address(0) in case there is non. 
-            "governor": "0x0000000000000000000000000000000000000002", // The owner of the xERC20.
-            "isNativeGasToken": false, // True if the ERC20 token is the native gas token of the chain. Ex: ETH for ethereum or MATIC for polygon.
-            "bridgeDetails": [ // The bridges to be configured for the xERC20 token on this particular chain.
-                {
-                    "bridge": "0x0000000000000000000000000000000000000003", // The bridge address.
-                    "burnLimit": 1000e18, // The bridge burn limit.
-                    "mintLimit": 1000e18  // The bridge mint limit.
-                }
-            ]
-        }
-    ]
-}
-```
+When either is set, the script deploys the `XERC20Lockbox` and wires it (as `FACTORY`) before handing ownership to the governor.
 
-> ℹ️ Important Note: An address cannot deploy a token with the same name and symbol more than once on any given chain. Ensure that you have not previously deployed a token with the same name or symbol using your address.
+### 3. Dry-Run
 
-Save your changes to proceed.
-
-### 5. Compile Your Smart Contract
-
-Ensure that everything in your smart contract is set up correctly and free of errors by compiling it with the following command:
+Verify the deployment and estimate gas without broadcasting:
 
 ```sh
-yarn build
+forge script SUPRTokenV2Deploy --rpc-url $RPC_URL --account $DEPLOYER_NAME
 ```
 
-You should see a confirmation in your terminal, similar to the screenshot below:
+(Use `LobsterTokenDeploy` for the BUILD token.)
 
-![Screenshot 2023-10-27 at 1 59 00 PM](https://github.com/prathmeshkhandelwal1/Chat-App/assets/56167998/e05f8c07-ac4c-4a36-a9ae-05884ff5aad4)
+### 4. Deploy
 
-### 6. Dry-Run Deployment
-
-Before proceeding with the actual deployment of your token, it is crucial to perform a dry-run. This helps in verifying the deployment process and estimating the gas costs on all the selected chains. Run the following command to initiate a dry-run:
+Broadcast and verify:
 
 ```sh
-yarn run script:DeployXERC20
+pnpm deploy:token          # SUPRTokenV2 (Superseed / SUPR)
+pnpm deploy:lobster-token  # LobsterToken (Lobsters / BUILD)
 ```
 
-You will receive the xERC20 token address, transaction details, and gas estimates as shown in the screenshots below:
+The script prints the deployed token address (and the lockbox address, if one was deployed). 🚀
 
-![Screenshot 2023-10-27 at 2 02 15 PM](https://github.com/prathmeshkhandelwal1/Chat-App/assets/56167998/fc24b67e-3123-43e4-b388-2b6237e150bc)
+### 5. Configure Bridges
 
-![Screenshot 2023-10-27 at 2 05 23 PM](https://github.com/prathmeshkhandelwal1/Chat-App/assets/56167998/0654c085-4f41-4cf0-b940-8030ba396fec)
-
-### 7. Deploy Your xERC20 Token
-
-You are now at the final step of the deployment process. With all the previous steps successfully completed, you are ready to deploy your xERC20 token to the selected blockchain networks. Run the following command to initiate the deployment:
+Bridge rate limits are not set at deploy time. Once ownership is with the governor, the governor registers each bridge:
 
 ```sh
-yarn run script:DeployXERC20:broadcast
+cast send <token> "setLimits(address,uint256,uint256)" <bridge> <mintLimit> <burnLimit> \
+  --rpc-url $RPC_URL --account <governor keystore>
 ```
 
-Congratulations! You have successfully deployed your xERC20 token. 🚀
+### 6. (Optional) Deploy the Converter
+
+Once SUPR0 (old SUPR), SUPR1 (SUPRTokenV2) and BUILD (LobsterToken) all exist, deploy the one-way converter and follow its printed instructions to grant it burn/mint rights on the three tokens:
+
+```sh
+pnpm deploy:converter
+```
 
 See the [Foundry Book for available options](https://book.getfoundry.sh/reference/forge/forge-create.html).
 

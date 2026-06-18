@@ -102,7 +102,7 @@ contract LobsterTokenInvariants is Test {
   address internal _owner = vm.addr(0xA11CE);
 
   function setUp() public {
-    _token = new LobsterToken('Lobsters', 'BUILD', _owner);
+    _token = new LobsterToken(_owner);
 
     address[] memory _bridges = new address[](2);
     _bridges[0] = vm.addr(0xB1);

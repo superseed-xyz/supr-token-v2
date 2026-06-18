@@ -20,7 +20,7 @@ abstract contract Base is Test {
 
   function setUp() public virtual {
     vm.startPrank(_owner);
-    _token = new SUPRTokenV2('Superseed', 'SUPR', _owner);
+    _token = new SUPRTokenV2(_owner);
     vm.stopPrank();
   }
 }
@@ -48,7 +48,7 @@ contract UnitNames is Base {
 
   function testConstructorRevertsOnZeroFactory() public {
     vm.expectRevert(SUPRTokenV2.SUPRTokenV2_ZeroFactory.selector);
-    new SUPRTokenV2('Superseed', 'SUPR', address(0));
+    new SUPRTokenV2(address(0));
   }
 }
 
@@ -224,7 +224,7 @@ contract UnitLockbox is Base {
   }
 
   function testSetLockboxEmitsEvent() public {
-    SUPRTokenV2 _newToken = new SUPRTokenV2('T', 'T', address(this));
+    SUPRTokenV2 _newToken = new SUPRTokenV2(address(this));
     vm.expectEmit(true, true, true, true);
     emit LockboxSet(_lockbox);
     _newToken.setLockbox(_lockbox);
@@ -235,7 +235,7 @@ contract UnitLockbox is Base {
   ) public {
     vm.assume(_caller != _owner);
     vm.assume(_caller != address(this)); // address(this) is the factory of _newToken below
-    SUPRTokenV2 _newToken = new SUPRTokenV2('T', 'T', address(this));
+    SUPRTokenV2 _newToken = new SUPRTokenV2(address(this));
     vm.prank(_caller);
     vm.expectRevert(IXERC20.IXERC20_NotFactory.selector);
     _newToken.setLockbox(_lockbox);

@@ -7,7 +7,9 @@ pragma solidity 0.8.35;
  * @notice Superseed V2 token — xERC20 (EIP-7281).
  *
  *         Extends the canonical defi-wonderland/xERC20 library (lib/xERC20) for all
- *         cross-chain bridge rate-limiting. SUPR-specific additions:
+ *         cross-chain bridge rate-limiting. The on-chain name ("Superseed") and symbol
+ *         ("SUPR") are baked into the contract rather than passed at deploy time.
+ *         SUPR-specific additions:
  *           - Zero-address factory guard in the constructor.
  *           - Receiver guard on every token movement, via a single
  *             _beforeTokenTransfer hook: the token contract itself cannot receive.
@@ -31,11 +33,17 @@ contract SUPRTokenV2 is XERC20, IERC165 {
   error SUPRTokenV2_InvalidReceiver(address receiver);
   error SUPRTokenV2_ZeroFactory();
 
+  /// @notice Token name — baked into the contract, not a deploy-time argument.
+  string private constant _NAME = 'Superseed';
+  /// @notice Token symbol — baked into the contract, not a deploy-time argument.
+  string private constant _SYMBOL = 'SUPR';
+
+  /// @param _factory Address allowed to set the lockbox (immutable FACTORY) and the token's
+  ///        initial owner. Deploy scripts pass the broadcaster, which then hands ownership to
+  ///        the governor.
   constructor(
-    string memory _name,
-    string memory _symbol,
     address _factory
-  ) XERC20(_name, _symbol, _factory) {
+  ) XERC20(_NAME, _SYMBOL, _factory) {
     if (_factory == address(0)) revert SUPRTokenV2_ZeroFactory();
   }
 

@@ -2,10 +2,8 @@
 pragma solidity 0.8.35;
 
 import {LobsterToken} from '../../contracts/LobsterToken.sol';
-import {LobsterTokenFactory} from '../../contracts/LobsterTokenFactory.sol';
 import {SUPRConverter} from '../../contracts/SUPRConverter.sol';
 import {SUPRTokenV2} from '../../contracts/SUPRTokenV2.sol';
-import {SUPRTokenV2Factory} from '../../contracts/SUPRTokenV2Factory.sol';
 import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import {XERC20} from '@xERC20/contracts/XERC20.sol';
 import {XERC20Lockbox} from '@xERC20/contracts/XERC20Lockbox.sol';
@@ -45,11 +43,7 @@ abstract contract IntegrationBase is Test {
 
   uint256 internal constant _LIMIT = 1_000_000e18;
 
-  SUPRTokenV2Factory internal _factory;
-
-  function setUp() public virtual {
-    _factory = new SUPRTokenV2Factory();
-  }
+  function setUp() public virtual {}
 
   function _empty() internal pure returns (uint256[] memory _u, address[] memory _a) {
     _u = new uint256[](0);
@@ -67,6 +61,55 @@ abstract contract IntegrationBase is Test {
     _bl[0] = _burn;
     _br[0] = _bridge;
   }
+
+  /// @dev Direct SUPRTokenV2 deploy mirroring the production script: the deployer is the
+  ///      token's FACTORY + initial owner, configures the supplied bridge limits, then hands
+  ///      ownership to `_owner`.
+  function _deploySUPR(
+    uint256[] memory _ml,
+    uint256[] memory _bl,
+    address[] memory _br,
+    address _owner
+  ) internal returns (SUPRTokenV2 _token) {
+    vm.startPrank(_deployer);
+    _token = new SUPRTokenV2(_deployer);
+    for (uint256 _i; _i < _br.length; _i++) {
+      _token.setLimits(_br[_i], _ml[_i], _bl[_i]);
+    }
+    _token.transferOwnership(_owner);
+    vm.stopPrank();
+  }
+
+  /// @dev Direct LobsterToken deploy, identical flow to _deploySUPR.
+  function _deployBuild(
+    uint256[] memory _ml,
+    uint256[] memory _bl,
+    address[] memory _br,
+    address _owner
+  ) internal returns (LobsterToken _token) {
+    vm.startPrank(_deployer);
+    _token = new LobsterToken(_deployer);
+    for (uint256 _i; _i < _br.length; _i++) {
+      _token.setLimits(_br[_i], _ml[_i], _bl[_i]);
+    }
+    _token.transferOwnership(_owner);
+    vm.stopPrank();
+  }
+
+  /// @dev Direct SUPRTokenV2 + lockbox deploy: the deployer (FACTORY) wires the lockbox before
+  ///      handing ownership to `_owner`.
+  function _deploySUPRWithLockbox(
+    address _baseToken,
+    bool _isNative,
+    address _owner
+  ) internal returns (SUPRTokenV2 _token, XERC20Lockbox _lockbox) {
+    vm.startPrank(_deployer);
+    _token = new SUPRTokenV2(_deployer);
+    _lockbox = new XERC20Lockbox(address(_token), _baseToken, _isNative);
+    _token.setLockbox(address(_lockbox));
+    _token.transferOwnership(_owner);
+    vm.stopPrank();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,8 +120,7 @@ contract IntegrationDeployAndBridge is IntegrationBase {
   function testEndToEndBridgeFlow() public {
     (uint256[] memory _ml, uint256[] memory _bl, address[] memory _br) = _withBridge(_LIMIT, _LIMIT);
 
-    vm.prank(_deployer);
-    SUPRTokenV2 _token = SUPRTokenV2(_factory.deployXERC20('Superseed', 'SUPR', _ml, _bl, _br, _governor));
+    SUPRTokenV2 _token = _deploySUPR(_ml, _bl, _br, _governor);
 
     // Ownership landed on the governor, not the deployer.
     assertEq(_token.owner(), _governor);
@@ -107,8 +149,7 @@ contract IntegrationDeployAndBridge is IntegrationBase {
 
   function testGovernorKillSwitch() public {
     (uint256[] memory _ml, uint256[] memory _bl, address[] memory _br) = _withBridge(_LIMIT, 0);
-    vm.prank(_deployer);
-    SUPRTokenV2 _token = SUPRTokenV2(_factory.deployXERC20('Superseed', 'SUPR', _ml, _bl, _br, _governor));
+    SUPRTokenV2 _token = _deploySUPR(_ml, _bl, _br, _governor);
 
     // Governor disables the bridge entirely.
     vm.prank(_governor);
@@ -132,13 +173,8 @@ contract IntegrationLockbox is IntegrationBase {
   function setUp() public override {
     super.setUp();
     _base = new MockBase();
-    (uint256[] memory _u, address[] memory _a) = _empty();
 
-    vm.prank(_deployer);
-    (address _t, address payable _l) =
-      _factory.deployXERC20WithLockbox('Superseed', 'SUPR', _u, _u, _a, address(_base), false, _governor);
-    _token = SUPRTokenV2(_t);
-    _lockbox = XERC20Lockbox(_l);
+    (_token, _lockbox) = _deploySUPRWithLockbox(address(_base), false, _governor);
 
     _base.mint(_user, 500e18);
   }
@@ -184,14 +220,13 @@ contract IntegrationLockbox is IntegrationBase {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Conversion: old SUPR (SUPR0) → converter → split of new SUPR (SUPR1) + BUILD
-// (both new tokens deployed via their respective CREATE3 factories)
+// (both new tokens deployed directly)
 // ─────────────────────────────────────────────────────────────────────────────
 
 contract IntegrationConversion is IntegrationBase {
   MockOldSUPR internal _old;
   SUPRTokenV2 internal _new;
   LobsterToken internal _build;
-  LobsterTokenFactory internal _lobsterFactory;
   SUPRConverter internal _converter;
 
   uint256 internal constant _BRIDGE_LIMIT = 100_000_000_000e18; // ≥ max BUILD mintable
@@ -208,14 +243,11 @@ contract IntegrationConversion is IntegrationBase {
 
     (uint256[] memory _u, address[] memory _a) = _empty();
 
-    // SUPR1 via the SUPR factory, owned by the governor.
-    vm.prank(_deployer);
-    _new = SUPRTokenV2(_factory.deployXERC20('Superseed', 'SUPR', _u, _u, _a, _governor));
+    // SUPR1 deployed directly, owned by the governor.
+    _new = _deploySUPR(_u, _u, _a, _governor);
 
-    // BUILD via the Lobster factory, owned by the governor.
-    _lobsterFactory = new LobsterTokenFactory();
-    vm.prank(_deployer);
-    _build = LobsterToken(_lobsterFactory.deployXERC20('Lobsters', 'BUILD', _u, _u, _a, _governor));
+    // BUILD deployed directly, owned by the governor.
+    _build = _deployBuild(_u, _u, _a, _governor);
 
     // Converter wired as burner on SUPR0 and minter on SUPR1 and BUILD.
     _converter = new SUPRConverter(address(_old), address(_new), address(_build));

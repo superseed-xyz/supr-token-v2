@@ -107,8 +107,8 @@ contract SUPRConverterInvariants is Test {
   function setUp() public {
     _old = new MockOldSUPR(_governor);
     vm.startPrank(_governor);
-    _new = new SUPRTokenV2('Superseed', 'SUPR', _governor);
-    _build = new LobsterToken('Lobsters', 'BUILD', _governor);
+    _new = new SUPRTokenV2(_governor);
+    _build = new LobsterToken(_governor);
     vm.stopPrank();
     _conv = new SUPRConverter(address(_old), address(_new), address(_build));
 
