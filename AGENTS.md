@@ -8,7 +8,7 @@ Superseed Protocol — a decentralized money market (lending/borrowing) on Ether
 
 ## Stack
 
-- **Language**: Solidity 0.8.25 (EVM target: Prague)
+- **Language**: Solidity 0.8.35 (EVM target: Prague)
 - **Framework**: Foundry (forge build/test, via IR enabled)
 - **Package manager**: pnpm (not yarn, not npm)
 - **Linting**: `forge fmt` + solhint (wonderland config)

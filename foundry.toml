@@ -1,5 +1,6 @@
 [profile.default]
 solc = '0.8.35'
+evm_version = 'prague'
 src = 'solidity'
 test = 'solidity/test'
 out = 'out'
