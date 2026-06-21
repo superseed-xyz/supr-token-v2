@@ -1,0 +1,5 @@
+{
+  "filter_paths": "lib/,solidity/test/,solidity/scripts/",
+  "foundry_out_directory": "out",
+  "exclude_dependencies": true
+}

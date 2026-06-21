@@ -10,6 +10,9 @@ out-via-ir
 # Config files
 .env
 
+# Claude Code local config (not tracked)
+.claude/
+
 # Avoid ignoring gitkeep
 !/**/.gitkeep
 
